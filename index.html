@@ -333,6 +333,143 @@
 
   .loading { text-align: center; padding: 60px 16px; color: var(--fg-muted); font-size: 0.9rem; }
 
+  /* Dashboard filter bar */
+  .dash-filter-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+    padding: 0 2px;
+  }
+  .dash-filter-group {
+    display: flex;
+    align-items: center;
+    background: rgba(255,255,255,0.04);
+    border-radius: 10px;
+    padding: 3px;
+    gap: 2px;
+  }
+  .dash-filter-group .filter-label {
+    font-size: 0.65rem;
+    font-weight: 600;
+    color: var(--fg-muted-dark);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    padding: 0 8px;
+    white-space: nowrap;
+  }
+  .dash-fbtn {
+    font-family: inherit;
+    font-size: 0.74rem;
+    font-weight: 600;
+    padding: 6px 12px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    background: transparent;
+    color: var(--fg-muted-dark);
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .dash-fbtn:hover { color: var(--fg-on-dark); background: rgba(255,255,255,0.06); }
+  .dash-fbtn.active {
+    background: var(--accent);
+    color: #fff;
+    box-shadow: 0 2px 8px rgba(192,81,63,0.3);
+  }
+  .dash-date-nav {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    background: rgba(255,255,255,0.04);
+    border-radius: 10px;
+    padding: 3px;
+  }
+  .dash-date-arrow {
+    font-family: inherit;
+    font-size: 0.82rem;
+    font-weight: 700;
+    width: 30px;
+    height: 30px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    background: transparent;
+    color: var(--fg-muted-dark);
+    transition: all 0.15s;
+    padding: 0;
+    line-height: 1;
+  }
+  .dash-date-arrow:hover { color: var(--fg-on-dark); background: rgba(255,255,255,0.08); }
+  .dash-date-arrow:disabled { opacity: 0.25; cursor: default; }
+  .dash-date-arrow:disabled:hover { background: transparent; color: var(--fg-muted-dark); }
+  .dash-date-display {
+    font-family: 'Space Mono', monospace;
+    font-size: 0.76rem;
+    font-weight: 600;
+    color: var(--fg-on-dark);
+    padding: 6px 10px;
+    cursor: pointer;
+    border-radius: 8px;
+    transition: background 0.15s;
+    white-space: nowrap;
+    position: relative;
+  }
+  .dash-date-display:hover { background: rgba(255,255,255,0.06); }
+  .dash-date-display input[type="date"] {
+    position: absolute;
+    inset: 0;
+    opacity: 0;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+    font-size: 16px;
+    z-index: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    border: none;
+    background: transparent;
+    color: transparent;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+  .dash-date-display input[type="date"]::-webkit-calendar-picker-indicator {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    cursor: pointer;
+    opacity: 0;
+  }
+  .dash-date-today {
+    font-family: inherit;
+    font-size: 0.68rem;
+    font-weight: 600;
+    padding: 4px 10px;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    background: rgba(255,255,255,0.06);
+    color: var(--fg-muted-dark);
+    transition: all 0.15s;
+    white-space: nowrap;
+    margin-left: 2px;
+  }
+  .dash-date-today:hover { color: var(--fg-on-dark); background: rgba(255,255,255,0.1); }
+  .dash-date-today.hidden { display: none; }
+  @media (max-width: 600px) {
+    .dash-filter-bar { gap: 6px; }
+    .dash-fbtn { padding: 5px 9px; font-size: 0.7rem; }
+    .dash-date-display { font-size: 0.7rem; padding: 5px 6px; }
+  }
+
   .top-products { list-style: none; padding: 0; margin: 0; }
   .top-products li {
     display: flex; justify-content: space-between; align-items: center;
@@ -466,6 +603,8 @@ const db = firebase.firestore();
 let allOrders = [];
 let pricingConfig = { ...DEFAULT_CONFIG };
 let currentFilter = 'todos';
+let currentPlatformFilter = 'todas';
+let currentDateFilter = '';
 let unsubOrders = null, unsubConfig = null;
 
 // Mapa de apelidos → emails reais (adicione os seus aqui)
@@ -620,51 +759,119 @@ function renderHeroStats() {
 }
 
 // --- Dashboard ---
+function setPlatformFilter(value) {
+  currentPlatformFilter = value;
+  renderDashboard();
+}
+function setDateFilter(value) {
+  currentDateFilter = value;
+  renderDashboard();
+}
+function shiftDate(days) {
+  const today = todayISO();
+  const active = currentDateFilter || today;
+  const d = new Date(active + 'T12:00:00');
+  d.setDate(d.getDate() + days);
+  const iso = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  if (iso > today) return;
+  currentDateFilter = iso;
+  renderDashboard();
+}
+function goToToday() {
+  currentDateFilter = '';
+  renderDashboard();
+}
+
+function getOrderPlatform(o) {
+  if (o.plataforma) return o.plataforma;
+  return 'Formulario';
+}
+
+function formatDateFull(iso) {
+  const WEEKDAYS = ['dom','seg','ter','qua','qui','sex','sab'];
+  const d = new Date(iso + 'T12:00:00');
+  return WEEKDAYS[d.getDay()] + ', ' + iso.split('-')[2] + '/' + iso.split('-')[1];
+}
+
 function renderDashboard() {
   const now = new Date();
   const curYear = now.getFullYear();
   const curMonth = now.getMonth();
   const today = todayISO();
+  const activeDate = currentDateFilter || today;
 
   const confirmed = allOrders.filter(o => o.status === 'entregue');
 
-  const totalToday = confirmed.filter(o => o.date === today).reduce((s,o) => s + getOrderTotal(o), 0);
+  const platforms = [...new Set(allOrders.map(o => getOrderPlatform(o)))].sort();
 
-  const monthConfirmed = confirmed.filter(o => {
+  const filteredConfirmed = currentPlatformFilter === 'todas'
+    ? confirmed
+    : confirmed.filter(o => getOrderPlatform(o) === currentPlatformFilter);
+
+  const totalDay = filteredConfirmed.filter(o => o.date === activeDate).reduce((s,o) => s + getOrderTotal(o), 0);
+
+  const [aY, aM] = activeDate.split('-').map(Number);
+  const monthConfirmed = filteredConfirmed.filter(o => {
     if (!o.date) return false;
     const [y,m] = o.date.split('-').map(Number);
-    return y === curYear && m === curMonth+1;
+    return y === aY && m === aM;
   });
   const totalMonth = monthConfirmed.reduce((s,o) => s + getOrderTotal(o), 0);
 
-  const yearConfirmed = confirmed.filter(o => {
+  const yearConfirmed = filteredConfirmed.filter(o => {
     if (!o.date) return false;
-    return o.date.startsWith(String(curYear));
+    return o.date.startsWith(String(aY));
   });
   const totalYear = yearConfirmed.reduce((s,o) => s + getOrderTotal(o), 0);
 
-  const totalAll = confirmed.reduce((s,o) => s + getOrderTotal(o), 0);
+  const totalAll = filteredConfirmed.reduce((s,o) => s + getOrderTotal(o), 0);
+
+  const isToday = activeDate === today;
+  const isTodayDisabled = isToday ? 'disabled' : '';
+  const dateDisplay = isToday ? 'Hoje' : formatDateFull(activeDate);
+
+  const platformBtns = [
+    `<button class="dash-fbtn ${currentPlatformFilter==='todas'?'active':''}" onclick="setPlatformFilter('todas')">Todas</button>`,
+    ...platforms.map(p =>
+      `<button class="dash-fbtn ${currentPlatformFilter===p?'active':''}" onclick="setPlatformFilter('${escapeHtml(p)}')">${escapeHtml(p)}</button>`
+    )
+  ].join('');
 
   document.getElementById('dashFaturamento').innerHTML = `
     <div class="hero-title">Faturamento</div>
-    <div class="hero-subtitle">Valores em reais (R$)</div>
+    <div class="hero-subtitle" style="margin-bottom:14px">${currentPlatformFilter !== 'todas' ? escapeHtml(currentPlatformFilter) + ' &mdash; ' : ''}Valores em reais (R$)</div>
+    <div class="dash-filter-bar">
+      <div class="dash-filter-group">
+        <span class="filter-label">Plataforma</span>
+        ${platformBtns}
+      </div>
+      <div class="dash-date-nav">
+        <button class="dash-date-arrow" onclick="shiftDate(-1)" title="Dia anterior">&#8249;</button>
+        <div class="dash-date-display">
+          ${escapeHtml(dateDisplay)}
+          <input type="date" value="${activeDate}" max="${today}" onchange="setDateFilter(this.value)">
+        </div>
+        <button class="dash-date-arrow" onclick="shiftDate(1)" ${isTodayDisabled} title="Proximo dia">&#8250;</button>
+        <button class="dash-date-today ${isToday?'hidden':''}" onclick="goToToday()">Hoje</button>
+      </div>
+    </div>
     <div class="hero-grid">
       <div class="hero-card">
-        <div class="hero-card-label"><span class="pulse-dot green"></span> Diario</div>
-        <div class="hero-card-value">${formatCurrency(totalToday)}</div>
-        <div class="hero-card-sub">faturado hoje</div>
-        <div class="hero-progress"><div class="hero-progress-bar" style="width:${totalMonth?Math.min(Math.round(totalToday/totalMonth*100),100):0}%;background:var(--success)"></div></div>
+        <div class="hero-card-label"><span class="pulse-dot green"></span> ${isToday ? 'Hoje' : formatDate(activeDate)}</div>
+        <div class="hero-card-value">${formatCurrency(totalDay)}</div>
+        <div class="hero-card-sub">faturado ${isToday ? 'hoje' : 'no dia'}</div>
+        <div class="hero-progress"><div class="hero-progress-bar" style="width:${totalMonth?Math.min(Math.round(totalDay/totalMonth*100),100):0}%;background:var(--success)"></div></div>
       </div>
       <div class="hero-card">
         <div class="hero-card-label"><span class="pulse-dot blue"></span> Mensal</div>
         <div class="hero-card-value">${formatCurrency(totalMonth)}</div>
-        <div class="hero-card-sub">${MONTHS_PT[curMonth]} ${curYear}</div>
+        <div class="hero-card-sub">${MONTHS_PT[aM-1]} ${aY}</div>
         <div class="hero-progress"><div class="hero-progress-bar" style="width:${totalYear?Math.min(Math.round(totalMonth/totalYear*100),100):0}%;background:var(--info)"></div></div>
       </div>
       <div class="hero-card">
         <div class="hero-card-label"><span class="pulse-dot orange"></span> Anual</div>
         <div class="hero-card-value">${formatCurrency(totalYear)}</div>
-        <div class="hero-card-sub">${curYear}</div>
+        <div class="hero-card-sub">${aY}</div>
         <div class="hero-progress"><div class="hero-progress-bar" style="width:${totalAll?Math.min(Math.round(totalYear/totalAll*100),100):0}%;background:var(--warning)"></div></div>
       </div>
       <div class="hero-card">
